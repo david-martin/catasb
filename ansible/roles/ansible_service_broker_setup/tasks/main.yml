@@ -10,17 +10,26 @@
   - name: Curling ansible-service-broker-all.yaml
     get_url:
       url: https://raw.githubusercontent.com/openshift/ansible-service-broker/master/ansible-service-broker-all.yaml
-      dest: /templates/ansible-service-broker-all.yaml.j2
+      dest: /tmp/deploy-ansible-service-broker-all.yaml.j2
 
-  - name: Rendering ansible-service-broker-all.yaml
+  - name: Setting facts for rendering ansible-service-broker-all.yaml template
+    set_fact:
+      dockerhub_pass: "{{ dockerhub_user_password }}"
+      dockerhub_user: "{{ dockerhub_user_name }}"
+      dockerhub_org: "{{ dockerhub_org_name }}"
+      openshift_pass: "{{ cluster_user_password }}"
+      openshift_user: "{{ cluster_user }}"
+      openshift_target: "{{ openshift_url }}"
+
+  - name: Rendering deploy-ansible-service-broker-all.yaml
     template:
-      src: ansible-service-broker-all.yaml.j2
-      dest: /tmp/ansible-service-broker-all.yaml
+      src: /tmp/deploy-ansible-service-broker-all.yaml.j2
+      dest: /tmp/deploy-ansible-service-broker-all.yaml
       owner: "{{ ansible_env.USER }}"
       mode: 0644
 
   - name: Create ansible-service-broker-all
-    shell: "{{ oc_cmd }} create -f /tmp/ansible-service-broker-all.yaml"
+    shell: "{{ oc_cmd }} create -f /tmp/deploy-ansible-service-broker-all.yaml"
 
   - name: Switch project to ansible-service-broker
     shell: "{{ oc_cmd }} project ansible-service-broker"
@@ -54,7 +63,6 @@
     uri:
       url: http://{{ ansible_service_broker_route }}/v2/bootstrap
       method: POST
-    when: asbcli_up.changed
     register: response
     until: response|success and response.json and response.json.spec_count
     retries: 3
@@ -70,4 +78,3 @@
 
   - name: Create Broker resource in Service Catalog
     shell: "{{ kubectl_cmd }} --kubeconfig={{ ansible_env.HOME }}/.kube/service-catalog.config create -f /tmp/ansible_service_broker.yaml"
-    when: asbcli_up.changed
